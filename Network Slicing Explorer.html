@@ -1,0 +1,658 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Network Slicing Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky bar, then one visual per concept. Each section is a heading, one short line, and a live diagram. Slice colours: blue = eMBB, orange = URLLC, green = mMTC. */
+:root{
+  --bg:#f2f5f9; --surface:#ffffff; --surface2:#e8edf4; --ink:#0d1626; --muted:#4f5d75; --line:#d3dbe7; --on:#ffffff;
+  --embb:#2159d6; --embb-soft:#e0e9ff;
+  --urllc:#c2410c; --urllc-soft:#ffe8dc;
+  --mmtc:#077a57; --mmtc-soft:#d7f3ea;
+  --f-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a1121; --surface:#111a30; --surface2:#18233f; --ink:#e8eefb; --muted:#98a6c3; --line:#26324f; --on:#08101f;
+  --embb:#6aa2ff; --embb-soft:#14284f; --urllc:#ff8f55; --urllc-soft:#3a2216; --mmtc:#35d3a0; --mmtc-soft:#103227; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0a1121; --surface:#111a30; --surface2:#18233f; --ink:#e8eefb; --muted:#98a6c3; --line:#26324f; --on:#08101f;
+  --embb:#6aa2ff; --embb-soft:#14284f; --urllc:#ff8f55; --urllc-soft:#3a2216; --mmtc:#35d3a0; --mmtc-soft:#103227; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;padding-inline:16px;padding-block:0}
+.s-embb{--c:var(--embb);--cs:var(--embb-soft)}
+.s-urllc{--c:var(--urllc);--cs:var(--urllc-soft)}
+.s-mmtc{--c:var(--mmtc);--cs:var(--mmtc-soft)}
+.wrap{max-width:1100px;margin-inline:auto}
+h1,h2,h3{font-family:var(--f-display);line-height:1.08;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.4rem,6.4vw,4.4rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.7rem,3.6vw,2.4rem);font-weight:700;letter-spacing:-.015em}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.short{color:var(--muted);font-size:1.05rem}
+:focus-visible{outline:3px solid var(--c,var(--ink));outline-offset:2px;border-radius:4px}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.bar .wrap{display:flex;align-items:center;gap:16px;min-height:52px}
+.brand{font-family:var(--f-display);font-weight:700;white-space:nowrap}
+.brand i{font-style:normal;color:var(--embb)} .brand b{color:var(--urllc)} .brand u{text-decoration:none;color:var(--mmtc)}
+.nav{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none}
+.nav a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:.9rem;padding:6px 10px;border-radius:6px}
+.nav a:hover{background:var(--surface2);color:var(--ink)}
+.theme{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+
+section{padding-block:60px 12px;scroll-margin-top:56px}
+.sec-head{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.viz{width:100%;display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.hero{padding-block:44px 8px;display:flex;flex-direction:column;gap:24px}
+.hero-top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px;align-items:end}
+#hero-canvas{height:340px}
+.keyidea{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.keyidea strong{font-family:var(--f-display);font-size:1.1rem}
+.pill{font-family:var(--f-mono);font-size:.78rem;padding:4px 12px;border-radius:999px;background:var(--cs);color:var(--c);border:1px solid var(--c);text-decoration:none}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 14px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--c,var(--ink));border-color:var(--c,var(--ink));color:var(--on)}
+.chip:hover{border-color:var(--c,var(--ink))}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:center;margin-top:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.switch{display:flex;gap:8px;align-items:center;font-weight:500;cursor:pointer;font-size:.92rem}
+.switch input{width:18px;height:18px;accent-color:var(--c,var(--ink))}
+.rng{display:flex;flex-direction:column;gap:2px;min-width:200px;flex:1}
+.rng label{display:flex;justify-content:space-between;gap:12px;font-size:.88rem}
+.rng b{font-family:var(--f-mono);font-weight:500}
+.rng input{width:100%;accent-color:var(--c,var(--ink))}
+.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 18px;border-radius:8px;cursor:pointer}
+.btn.primary{background:var(--c,var(--ink));border-color:var(--c,var(--ink));color:var(--on)}
+.btn:disabled{opacity:.4;cursor:default}
+.fine{font-size:.82rem;color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+
+.vscroll{overflow-x:auto}
+.vscroll>svg{min-width:720px;width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+svg text{font-family:var(--f-body)}
+.lanes .grp{transition:opacity .25s}
+.lanes .grp.dim{opacity:.18}
+.pillbox{stroke-width:1.5}
+.lbl{font-size:13px;font-weight:600;text-anchor:middle;fill:var(--ink)}
+.lh{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;fill:var(--muted);text-anchor:middle}
+.ln{font-family:var(--f-display);font-size:17px;font-weight:700}
+.eg{fill:none;stroke-width:2.5;stroke-dasharray:6 6;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+
+/* stepper */
+.stepper{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.stepper-top{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.arch{overflow-x:auto}
+.arch svg{min-width:700px;width:100%;height:auto;display:block}
+.node rect{fill:var(--surface2);stroke:var(--line);stroke-width:1.5;transition:fill .25s,stroke .25s}
+.node text{fill:var(--ink);font-size:15px;font-weight:600;text-anchor:middle}
+.node text.s{font-size:11px;font-weight:400;fill:var(--muted);font-family:var(--f-mono)}
+.node.on rect{fill:var(--c);stroke:var(--c)}
+.node.on text{fill:var(--on)}
+.edge{stroke:var(--line);stroke-width:2.5;fill:none}
+.edge.dash{stroke-dasharray:5 5}
+.edge.on{stroke:var(--c);stroke-width:3.5;stroke-dasharray:7 6;animation:flow 1s linear infinite}
+.plane{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.stepbody{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end;margin-top:10px}
+.stepbody h3{font-size:1.25rem;margin-bottom:4px}
+.stepbody p{color:var(--muted);min-height:1.6em}
+.btns{display:flex;gap:8px}
+.dots{display:flex;gap:6px;margin-top:12px}
+.dots button{width:34px;height:6px;border-radius:3px;border:0;background:var(--line);cursor:pointer;padding:0}
+.dots button.done{background:var(--c);opacity:.5}
+.dots button.cur{background:var(--c)}
+
+/* lab */
+#lab-canvas{height:300px}
+.readouts{display:flex;gap:10px;flex:1;min-width:260px}
+.ro{background:var(--surface2);border-radius:10px;padding:8px 12px;flex:1}
+.ro span{font-size:.75rem;color:var(--muted);display:block}
+.ro b{font-family:var(--f-display);font-size:1.5rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.ro.bad b{color:var(--urllc)} .ro.ok b{color:var(--mmtc)}
+
+/* matcher */
+.apps{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.match{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:20px;align-items:center}
+.match h3{font-size:1.6rem;margin-top:6px}
+.verdict{font-family:var(--f-mono);font-size:.82rem;color:var(--c)}
+.need{display:grid;grid-template-columns:130px minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:.88rem;margin-bottom:9px}
+.segs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.segs i{height:10px;border-radius:2px;background:var(--surface2)}
+.segs i.f{background:var(--c)}
+.need em{font-style:normal;font-family:var(--f-mono);color:var(--muted);text-align:right}
+
+/* 6G */
+.evo{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1.1fr);gap:0 8px}
+.evo .col-h{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:8px}
+.evo .box{padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:10px;font-family:var(--f-display);font-weight:700;color:var(--c)}
+.evo .arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);margin-bottom:10px;font-size:1.2rem}
+.evo .new{border-style:dashed;--c:var(--ink)}
+.evo .ghost{visibility:hidden}
+.range-chart{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.rc-head,.rc-row{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px}
+.rc-head{margin-bottom:6px}
+.rc-axis{position:relative;height:20px;font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.rc-axis span{position:absolute;transform:translateX(-50%)}
+.rc-row{align-items:center;padding-block:9px;border-top:1px solid var(--line)}
+.rc-row b{display:block;font-size:.92rem}
+.rc-row small{font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
+.track{position:relative;height:22px}
+.track::before{content:"";position:absolute;left:0;right:0;top:10px;height:2px;background:var(--surface2)}
+.track .tick{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.track .r{position:absolute;top:3px;height:16px;border-radius:8px;background:var(--embb);min-width:10px}
+.track .r.b{background:var(--urllc)} .track .r.c{background:var(--mmtc)}
+footer{border-top:1px solid var(--line);margin-top:60px;padding-block:24px 56px;font-size:.82rem;color:var(--muted)}
+
+@media (max-width:900px){
+  .hero-top{grid-template-columns:minmax(0,1fr)}
+  .match{grid-template-columns:minmax(0,1fr)}
+  .rc-head{grid-template-columns:minmax(0,1fr)} .rc-head>span{display:none}
+  .rc-row{grid-template-columns:minmax(0,1fr);gap:6px}
+  .evo{grid-template-columns:minmax(0,1fr)}
+  .evo .col-h,.evo .ghost{display:none}
+  .evo .arrow{transform:rotate(90deg);margin:-4px 0 6px;height:20px}
+}
+@media (max-width:560px){
+  .stepbody{grid-template-columns:minmax(0,1fr)}
+  .need{grid-template-columns:100px minmax(0,1fr) 24px}
+  #hero-canvas{height:300px}
+  .brand{font-size:.95rem}
+}
+@media (prefers-reduced-motion: reduce){.edge.on,.eg{animation:none}}
+</style>
+
+<div class="bar"><div class="wrap">
+  <span class="brand"><i>e</i><b>U</b><u>m</u> Slicing</span>
+  <nav class="nav" aria-label="Sections">
+    <a href="#what">Slicing</a><a href="#embb">eMBB</a><a href="#urllc">URLLC</a><a href="#mmtc">mMTC</a><a href="#how">How it works</a><a href="#lab">Isolation</a><a href="#match">Match</a><a href="#sixg">6G</a>
+  </nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+</div></div>
+
+<main class="wrap">
+
+<div class="hero">
+  <div class="hero-top">
+    <h1>Network slicing in 5G and 6G</h1>
+    <p class="short">One physical network, cut into virtual networks that each fit one kind of application.</p>
+  </div>
+  <canvas id="hero-canvas" class="viz" role="img" aria-label="Mixed traffic enters one shared network and is sorted into three slices: eMBB with large packets, URLLC with small fast packets, mMTC with many tiny packets."></canvas>
+  <div class="keyidea">
+    <strong>Key idea: different applications receive network services tailored to their requirements.</strong>
+    <div class="pills"><a class="pill s-embb" href="#embb">eMBB</a><a class="pill s-urllc" href="#urllc">URLLC</a><a class="pill s-mmtc" href="#mmtc">mMTC</a></div>
+  </div>
+</div>
+
+<section id="what">
+  <div class="sec-head"><span class="eyebrow">The picture</span><h2>Three slices through one network</h2></div>
+  <div class="chips" id="layer-filter" role="group" aria-label="Highlight a slice" style="margin-bottom:12px">
+    <button class="chip" type="button" aria-pressed="true" data-f="all">All</button>
+    <button class="chip s-embb" type="button" aria-pressed="false" data-f="embb">eMBB</button>
+    <button class="chip s-urllc" type="button" aria-pressed="false" data-f="urllc">URLLC</button>
+    <button class="chip s-mmtc" type="button" aria-pressed="false" data-f="mmtc">mMTC</button>
+  </div>
+  <div class="vscroll"><svg id="layers-svg" class="lanes" viewBox="0 0 900 290" role="img" aria-label="Three slices pass through radio, transport, core and cloud, each with its own settings"></svg></div>
+</section>
+
+<section id="embb" class="s-embb">
+  <div class="sec-head"><span class="eyebrow">Slice 1 · SST 1</span><h2 style="color:var(--c)">eMBB: Enhanced Mobile Broadband</h2><p class="short">High data rate. Pick a video quality and see how many streams one cell carries.</p></div>
+  <canvas id="embb-canvas" class="viz" style="height:360px" role="img" aria-label="A wide pipe carrying video streams, with a grid showing how many simultaneous streams fit in one cell"></canvas>
+  <div class="ctl">
+    <div class="chips" id="embb-q" role="group" aria-label="Video quality"></div>
+    <div class="fine mono">Illustrative: one cell with 1 Gbit/s shared by all users.</div>
+  </div>
+</section>
+
+<section id="urllc" class="s-urllc">
+  <div class="sec-head"><span class="eyebrow">Slice 2 · SST 2</span><h2 style="color:var(--c)">URLLC: Ultra-Reliable Low-Latency Communications</h2><p class="short">Low delay, high reliability. Switch features on and off and watch the 1 ms budget.</p></div>
+  <canvas id="urllc-canvas" class="viz" style="height:400px" role="img" aria-label="A latency budget bar and a grid of delivered and lost packets"></canvas>
+  <div class="ctl">
+    <label class="switch"><input type="checkbox" id="u-slots" checked> Short radio slots</label>
+    <label class="switch"><input type="checkbox" id="u-edge" checked> Edge server</label>
+    <label class="switch"><input type="checkbox" id="u-dup" checked> Duplicate path</label>
+    <div class="fine mono">Illustrative figures. Packet loss is exaggerated so you can see it.</div>
+  </div>
+</section>
+
+<section id="mmtc" class="s-mmtc">
+  <div class="sec-head"><span class="eyebrow">Slice 3 · SST 3</span><h2 style="color:var(--c)">mMTC: Massive Machine-Type Communications</h2><p class="short">Huge numbers of devices. Add devices, then see what reporting often does to the battery.</p></div>
+  <canvas id="mmtc-canvas" class="viz" style="height:380px" role="img" aria-label="A field of sensors around a tower, most asleep, with a battery gauge"></canvas>
+  <div class="ctl">
+    <div class="rng"><label for="m-dens"><span>Devices per km²</span><b id="m-dens-v"></b></label><input type="range" id="m-dens" min="2" max="6" step="0.05" value="4"></div>
+    <div class="rng"><label for="m-int"><span>Each device reports every</span><b id="m-int-v"></b></label><input type="range" id="m-int" min="0" max="4" step="1" value="3"></div>
+  </div>
+  <p class="fine mono" style="margin-top:8px">Illustrative: 5 Wh battery. Each report costs 2 J. Sleep draws 5 µW.</p>
+</section>
+
+<section id="how">
+  <div class="sec-head"><span class="eyebrow">How it works</span><h2>How a device gets its slice</h2></div>
+  <div class="stepper s-embb" id="stepper">
+    <div class="stepper-top">
+      <div class="chips" id="step-slice" role="group" aria-label="Choose slice for the walkthrough"></div>
+      <span class="mono fine" id="snssai"></span>
+    </div>
+    <div class="arch"><svg id="arch" viewBox="0 0 900 290" role="img" aria-label="Network functions involved in selecting a slice"></svg></div>
+    <div class="stepbody">
+      <div><span class="eyebrow" id="step-count"></span><h3 id="step-title"></h3><p id="step-text"></p></div>
+      <div class="btns"><button class="btn" id="prev" type="button">Back</button><button class="btn primary" id="next" type="button">Next step</button></div>
+    </div>
+    <div class="dots" id="dots"></div>
+  </div>
+</section>
+
+<section id="lab">
+  <div class="sec-head"><span class="eyebrow">Isolation lab</span><h2>One service floods the network</h2><p class="short">Send an eMBB burst. Watch URLLC delay with slicing off, then on.</p></div>
+  <canvas id="lab-canvas" class="viz" role="img" aria-label="Line chart of URLLC latency over time against a 1 millisecond target, with eMBB load below"></canvas>
+  <div class="ctl s-embb">
+    <label class="switch"><input type="checkbox" id="sliced"> Slicing on</label>
+    <div class="rng" style="flex:0 1 220px;min-width:180px"><label for="share"><span>URLLC reserved share</span><b id="share-v">20%</b></label><input type="range" id="share" min="10" max="40" step="1" value="20"></div>
+    <button class="btn primary" id="burst" type="button">Send eMBB burst (3 s)</button>
+    <div class="readouts">
+      <div class="ro" id="ro-lat"><span>URLLC latency</span><b id="lat-v">0.8 ms</b></div>
+      <div class="ro"><span>eMBB capacity used</span><b id="embb-v">50%</b></div>
+    </div>
+  </div>
+  <p class="fine" id="lab-msg" style="margin-top:8px">Illustrative queueing model, not a measurement.</p>
+</section>
+
+<section id="match">
+  <div class="sec-head"><span class="eyebrow">Match</span><h2>Which slice does it need?</h2></div>
+  <div class="apps" id="apps" role="group" aria-label="Applications"></div>
+  <div class="match s-embb" id="match"></div>
+</section>
+
+<section id="sixg">
+  <div class="sec-head"><span class="eyebrow">5G to 6G</span><h2>The same slices, pushed further</h2></div>
+  <div class="evo">
+    <div class="col-h">5G</div><div></div><div class="col-h">6G</div>
+    <div class="box s-embb">eMBB</div><div class="arrow" aria-hidden="true">→</div><div class="box s-embb">Immersive communication</div>
+    <div class="box s-urllc">URLLC</div><div class="arrow" aria-hidden="true">→</div><div class="box s-urllc">Hyper reliable, low-latency communication</div>
+    <div class="box s-mmtc">mMTC</div><div class="arrow" aria-hidden="true">→</div><div class="box s-mmtc">Massive communication</div>
+    <div class="box ghost">&nbsp;</div><div class="arrow" aria-hidden="true">+</div><div class="box new">Ubiquitous connectivity</div>
+    <div class="box ghost">&nbsp;</div><div class="arrow" aria-hidden="true">+</div><div class="box new">AI and communication</div>
+    <div class="box ghost">&nbsp;</div><div class="arrow" aria-hidden="true">+</div><div class="box new">Integrated sensing and communication</div>
+  </div>
+  <div class="range-chart">
+    <div class="rc-head"><span class="fine">6G target vs 5G, log scale</span><div class="rc-axis" id="rc-axis"></div></div>
+    <div id="rc-rows"></div>
+  </div>
+</section>
+
+</main>
+
+<footer><div class="wrap">Sources: 3GPP TS 23.501 and TS 28.530; ITU-R M.2083 and M.2160. 6G values are research targets (<a href="https://techblog.comsoc.org/2024/07/06/itu-r-imt-2030-6g-backgrounder-and-envisioned-capabilities/" target="_blank" rel="noopener" style="color:inherit">IEEE ComSoc summary</a>). All animations are simplified models.</div></footer>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var C={};
+function readColors(){
+  var cs=getComputedStyle(document.documentElement);
+  function g(n){return cs.getPropertyValue(n).trim()}
+  C={embb:g('--embb'),urllc:g('--urllc'),mmtc:g('--mmtc'),ink:g('--ink'),muted:g('--muted'),line:g('--line'),surface:g('--surface'),surface2:g('--surface2'),on:g('--on')};
+}
+readColors();
+function fit(cv){
+  var r=cv.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);
+  var w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));
+  if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
+  var x=cv.getContext('2d');x.setTransform(d,0,0,d,0,0);
+  return {x:x,w:r.width,h:r.height};
+}
+function rr(x,a,b,w,h,r){x.beginPath();if(x.roundRect){x.roundRect(a,b,w,h,r)}else{x.rect(a,b,w,h)}}
+function hash(n){var s=Math.sin(n*12.9898)*43758.5453;return s-Math.floor(s)}
+function sm(t){t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)}
+var FD="600 14px 'Bricolage Grotesque','Segoe UI',sans-serif", FM="11px 'IBM Plex Mono',ui-monospace,monospace";
+function poke(){if(reduce)redrawStatic()}
+
+/* theme */
+$('#theme').addEventListener('click',function(){
+  var root=document.documentElement,cur=root.getAttribute('data-theme');
+  var dark=cur?cur==='dark':(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+  root.setAttribute('data-theme',dark?'light':'dark');readColors();redrawStatic();
+});
+if(window.matchMedia){var mq=matchMedia('(prefers-color-scheme: dark)');var cbk=function(){readColors();redrawStatic()};if(mq.addEventListener)mq.addEventListener('change',cbk)}
+
+var KEYS=['embb','urllc','mmtc'],NAMES={embb:'eMBB',urllc:'URLLC',mmtc:'mMTC'},SST={embb:1,urllc:2,mmtc:3};
+
+/* ---------- layers diagram ---------- */
+(function(){
+  var cols=[220,410,600,790],ly=[88,160,232];
+  var T={embb:['Wide carriers','Big backhaul','Central UPF','CDN / cloud'],urllc:['Short slots','Priority paths','Edge UPF','Edge compute'],mmtc:['NB-IoT','Aggregated','Light core','IoT platform']};
+  var heads=['RADIO','TRANSPORT','CORE','CLOUD'],h='';
+  heads.forEach(function(t,i){h+='<text class="lh" x="'+cols[i]+'" y="26">'+t+'</text>'});
+  KEYS.forEach(function(k,r){
+    var y=ly[r],col='var(--'+k+')',soft='var(--'+k+'-soft)';
+    h+='<g class="grp" data-k="'+k+'">';
+    h+='<text class="ln" x="20" y="'+(y+6)+'" fill="'+col+'">'+NAMES[k]+'</text>';
+    for(var i=0;i<3;i++)h+='<line class="eg" x1="'+(cols[i]+70)+'" y1="'+y+'" x2="'+(cols[i+1]-70)+'" y2="'+y+'" stroke="'+col+'"/>';
+    for(i=0;i<4;i++)h+='<rect class="pillbox" x="'+(cols[i]-70)+'" y="'+(y-20)+'" width="140" height="40" rx="10" fill="'+soft+'" stroke="'+col+'"/><text class="lbl" x="'+cols[i]+'" y="'+(y+5)+'">'+T[k][i]+'</text>';
+    h+='</g>';
+  });
+  $('#layers-svg').innerHTML=h;
+  $$('#layer-filter .chip').forEach(function(b){b.addEventListener('click',function(){
+    var f=b.getAttribute('data-f');
+    $$('#layer-filter .chip').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+    $$('#layers-svg .grp').forEach(function(g){g.classList.toggle('dim',f!=='all'&&g.getAttribute('data-k')!==f)});
+  })});
+})();
+
+/* ---------- hero ---------- */
+var heroCv=$('#hero-canvas');
+function drawHero(t){
+  var f=fit(heroCv),x=f.x,w=f.w,h=f.h;x.clearRect(0,0,w,h);
+  var small=w<560,x0=w*0.28,x1=w*0.45,xe=w*(small?0.72:0.76),pipeH=h*0.34,cy=h/2;
+  var laneH=[h*0.22,h*0.09,h*0.13],laneY=[h*0.2,h*0.5,h*0.8],cols=[C.embb,C.urllc,C.mmtc];
+  rr(x,12,cy-pipeH/2,x0-12,pipeH,10);x.fillStyle=C.surface2;x.fill();x.strokeStyle=C.line;x.lineWidth=1.5;x.stroke();
+  var i,k;
+  for(i=0;i<3;i++){
+    x.save();x.globalAlpha=.16;x.strokeStyle=cols[i];x.lineWidth=laneH[i];x.lineCap='butt';
+    x.beginPath();x.moveTo(x0,cy);x.bezierCurveTo(x0+(x1-x0)*.5,cy,x0+(x1-x0)*.5,laneY[i],x1,laneY[i]);x.stroke();
+    x.fillStyle=cols[i];x.fillRect(x1-1,laneY[i]-laneH[i]/2,xe-x1+1,laneH[i]);x.restore();
+    x.save();x.globalAlpha=.55;x.strokeStyle=cols[i];x.lineWidth=1;x.strokeRect(x1,laneY[i]-laneH[i]/2,xe-x1,laneH[i]);x.restore();
+  }
+  var pw=[small?16:28,9,4],ph=[laneH[0]*.6,laneH[1]*.7,4],sp=[110,320,70],n=[7,6,24],L=xe+40;
+  for(i=0;i<3;i++){
+    for(k=0;k<n[i];k++){
+      var px=((t*sp[i]/1000)+k*(L/n[i]))%L-pw[i];
+      var oy=(hash(k*3.1+i*17.7)-.5)*(pipeH*.72-ph[i]),y;
+      if(px<x0)y=cy+oy;else if(px<x1)y=cy+oy+(laneY[i]-(cy+oy))*sm((px-x0)/(x1-x0));else y=laneY[i];
+      if(px+pw[i]<14)continue;
+      x.fillStyle=cols[i];
+      if(i===2){x.beginPath();x.arc(px+2,y,2.2,0,6.283);x.fill()}else{rr(x,px,y-ph[i]/2,pw[i],ph[i],i===0?3:2);x.fill()}
+    }
+  }
+  x.fillStyle=C.muted;x.font=FM;x.textBaseline='alphabetic';x.textAlign='left';
+  x.fillText('ONE SHARED NETWORK',14,cy-pipeH/2-10);
+  var nm=['eMBB','URLLC','mMTC'],sb=['big flows','tiny and fast','many devices'];
+  for(i=0;i<3;i++){
+    x.fillStyle=cols[i];x.font=FD;x.fillText(nm[i],xe+12,laneY[i]+(small?0:-2));
+    if(!small){x.fillStyle=C.muted;x.font=FM;x.fillText(sb[i],xe+12,laneY[i]+14)}
+  }
+}
+
+/* ---------- eMBB ---------- */
+var QS=[{n:'HD',m:8},{n:'4K',m:25},{n:'8K',m:100},{n:'VR',m:150}],qi=1,embbCv=$('#embb-canvas');
+(function(){
+  var c=$('#embb-q');
+  QS.forEach(function(q,i){var b=document.createElement('button');b.type='button';b.className='chip s-embb';b.textContent=q.n+' · '+q.m+' Mbit/s';b.setAttribute('aria-pressed',i===qi?'true':'false');
+    b.addEventListener('click',function(){qi=i;$$('#embb-q .chip').forEach(function(z){z.setAttribute('aria-pressed',z===b?'true':'false')});poke()});c.appendChild(b)});
+})();
+function drawEmbb(t){
+  var f=fit(embbCv),x=f.x,w=f.w,h=f.h;x.clearRect(0,0,w,h);x.textBaseline='alphabetic';
+  var q=QS[qi],N=Math.floor(1000/q.m),pad=24;
+  var py=46,pH=64,pl=pad,pr=w-pad;
+  x.fillStyle=C.ink;x.font=FD;x.textAlign='left';x.fillText('Cell capacity: 1 Gbit/s',pl,26);
+  x.textAlign='right';x.fillStyle=C.embb;x.fillText(N+' simultaneous '+q.n+' streams',pr,26);x.textAlign='left';
+  rr(x,pl,py,pr-pl,pH,12);x.fillStyle=C.surface2;x.fill();x.strokeStyle=C.embb;x.globalAlpha=.6;x.lineWidth=1.5;x.stroke();x.globalAlpha=1;
+  var bw=Math.max(12,8+q.m*.42),bh=pH*.64,gap=10,step=bw+gap,L=(pr-pl)+step;
+  x.save();rr(x,pl,py,pr-pl,pH,12);x.clip();
+  var nb=Math.ceil(L/step)+1;
+  for(var k=0;k<nb;k++){
+    var bx=pl+((t*0.14+k*step)%L)-step;
+    x.fillStyle=C.embb;rr(x,bx,py+(pH-bh)/2,bw,bh,4);x.fill();
+    if(bw>24){x.fillStyle=C.on;x.globalAlpha=.85;var cx=bx+bw/2,cy=py+pH/2,s=bh*.18;x.beginPath();x.moveTo(cx-s*.6,cy-s);x.lineTo(cx+s,cy);x.lineTo(cx-s*.6,cy+s);x.closePath();x.fill();x.globalAlpha=1}
+  }
+  x.restore();
+  var gy=py+pH+28,aw=pr-pl,ah=h-gy-34,s=40,cols,rows;
+  for(;s>=6;s--){cols=Math.floor(aw/(s+4));rows=Math.floor(ah/(s+4));if(cols*rows>=N)break}
+  cols=Math.max(1,Math.floor(aw/(s+4)));
+  var used=Math.min(N,cols*Math.max(1,Math.floor(ah/(s+4))));
+  for(var i=0;i<used;i++){
+    var cx2=pl+(i%cols)*(s+4),cy2=gy+Math.floor(i/cols)*(s+4);
+    var pulse=.55+.45*Math.sin(t/500+i*.9);
+    x.globalAlpha=.35+.65*pulse;x.fillStyle=C.embb;rr(x,cx2,cy2,s,s,Math.min(6,s/4));x.fill();
+    if(s>=14){x.globalAlpha=.9;x.fillStyle=C.on;var mx=cx2+s/2,my=cy2+s/2,r=s*.2;x.beginPath();x.moveTo(mx-r*.6,my-r);x.lineTo(mx+r,my);x.lineTo(mx-r*.6,my+r);x.closePath();x.fill()}
+    x.globalAlpha=1;
+  }
+  x.fillStyle=C.muted;x.font=FM;x.textAlign='left';x.fillText('1 tile = 1 user watching '+q.n+' ('+q.m+' Mbit/s each)',pl,h-10);
+}
+
+/* ---------- URLLC ---------- */
+var urllcCv=$('#urllc-canvas'),U={cur:[1,4,2],tgt:[.25,.1,.25],last:0,grid:[],roll:0,lost:0};
+function urllcTargets(){
+  var s=$('#u-slots').checked,e=$('#u-edge').checked;
+  return [s?.25:1.0,e?.1:4.0,e?.25:2.0];
+}
+function urllcRoll(){
+  var dup=$('#u-dup').checked,p=.06,pp=dup?p*p:p,g=[],lost=0;
+  for(var i=0;i<200;i++){var l=Math.random()<pp;g.push(l);if(l)lost++}
+  U.grid=g;U.lost=lost;
+}
+urllcRoll();
+['u-slots','u-edge','u-dup'].forEach(function(id){$('#'+id).addEventListener('change',function(){U.tgt=urllcTargets();urllcRoll();if(reduce){U.cur=U.tgt.slice();redrawStatic()}})});
+function drawUrllc(t){
+  var f=fit(urllcCv),x=f.x,w=f.w,h=f.h;x.clearRect(0,0,w,h);x.textBaseline='alphabetic';
+  var dt=Math.min(t-U.last,60);U.last=t;U.tgt=urllcTargets();
+  var i;
+  for(i=0;i<3;i++)U.cur[i]+=(U.tgt[i]-U.cur[i])*Math.min(1,dt/180);
+  if(t-U.roll>2200){U.roll=t;urllcRoll()}
+  var pad=24,bx=pad,bw=w-pad*2,by=64,bh=40,max=10;
+  var tot=U.cur[0]+U.cur[1]+U.cur[2],ok=tot<=1.0;
+  x.fillStyle=C.ink;x.font=FD;x.textAlign='left';x.fillText('Latency budget',pad,28);
+  x.textAlign='right';x.fillStyle=ok?C.mmtc:C.urllc;x.font="700 20px 'Bricolage Grotesque',sans-serif";
+  x.fillText(tot.toFixed(2)+' ms '+(ok?'✓ within 1 ms':'✗ over 1 ms'),w-pad,30);
+  rr(x,bx,by,bw,bh,8);x.fillStyle=C.surface2;x.fill();
+  var names=['Radio','Transport','Core + server'],al=[1,.68,.4],acc=0;
+  x.save();rr(x,bx,by,bw,bh,8);x.clip();
+  for(i=0;i<3;i++){
+    var sw=U.cur[i]/max*bw;x.globalAlpha=al[i];x.fillStyle=C.urllc;x.fillRect(bx+acc,by,sw,bh);x.globalAlpha=1;
+    if(sw>1){x.strokeStyle=C.surface;x.lineWidth=2;x.beginPath();x.moveTo(bx+acc+sw,by);x.lineTo(bx+acc+sw,by+bh);x.stroke()}
+    acc+=sw;
+  }
+  x.restore();
+  var lx=bx;x.font=FM;x.textAlign='left';
+  for(i=0;i<3;i++){x.globalAlpha=al[i];x.fillStyle=C.urllc;x.fillRect(lx,by+bh+14,10,10);x.globalAlpha=1;x.fillStyle=C.muted;var lab=names[i]+' '+U.cur[i].toFixed(2)+' ms';x.fillText(lab,lx+15,by+bh+23);lx+=Math.min(190,(w-pad*2)/3)}
+  x.fillStyle=C.muted;x.textAlign='center';
+  [0,2,4,6,8,10].forEach(function(v){var px=bx+v/max*bw;x.fillRect(px,by-5,1,5);x.fillText(v+(v===10?' ms':''),Math.min(Math.max(px,bx+8),bx+bw-12),by-9)});
+  var lx1=bx+1/max*bw;x.strokeStyle=C.ink;x.lineWidth=2;x.setLineDash([4,3]);x.beginPath();x.moveTo(lx1,by-4);x.lineTo(lx1,by+bh+4);x.stroke();x.setLineDash([]);
+  var gy=by+bh+62,cols=40,rows=5,cw=(w-pad*2)/cols,ch=Math.min(cw,(h-gy-40)/rows);
+  x.fillStyle=C.ink;x.font=FD;x.textAlign='left';x.fillText('200 packets sent',pad,gy-14);
+  x.textAlign='right';x.fillStyle=U.lost?C.urllc:C.mmtc;x.fillText('Lost: '+U.lost+(U.lost?'':'  ✓ all delivered'),w-pad,gy-14);
+  for(i=0;i<200;i++){
+    var cx=pad+(i%cols)*cw+cw/2,cy=gy+Math.floor(i/cols)*ch+ch/2;
+    if(U.grid[i]){x.strokeStyle=C.urllc;x.lineWidth=2;var r=Math.min(cw,ch)*.3;x.beginPath();x.moveTo(cx-r,cy-r);x.lineTo(cx+r,cy+r);x.moveTo(cx+r,cy-r);x.lineTo(cx-r,cy+r);x.stroke()}
+    else{x.fillStyle=C.urllc;x.globalAlpha=.8;x.beginPath();x.arc(cx,cy,Math.min(cw,ch)*.28,0,6.283);x.fill();x.globalAlpha=1}
+  }
+  x.fillStyle=C.muted;x.font=FM;x.textAlign='left';
+  x.fillText($('#u-dup').checked?'Each packet sent on two paths: lost only if both fail':'Each packet sent on one path',pad,h-12);
+}
+
+/* ---------- mMTC ---------- */
+var mmtcCv=$('#mmtc-canvas'),INTV=[{l:'1 min',m:1},{l:'10 min',m:10},{l:'1 hour',m:60},{l:'6 hours',m:360},{l:'24 hours',m:1440}];
+function mState(){
+  var e=parseFloat($('#m-dens').value),dev=Math.round(Math.pow(10,e)),iv=INTV[parseInt($('#m-int').value,10)];
+  var rpy=525600/iv.m,E=18000,life=E/(157+rpy*2);
+  return {dev:dev,iv:iv,life:life};
+}
+function fmt(n){return n.toLocaleString('en-US')}
+function mLabels(){var s=mState();$('#m-dens-v').textContent=fmt(s.dev);$('#m-int-v').textContent=s.iv.l}
+['m-dens','m-int'].forEach(function(id){$('#'+id).addEventListener('input',function(){mLabels();poke()})});
+mLabels();
+function drawMmtc(t){
+  var f=fit(mmtcCv),x=f.x,w=f.w,h=f.h;x.clearRect(0,0,w,h);x.textBaseline='alphabetic';
+  var s=mState(),pad=20,tx=w-70,ty=52;
+  var fx=pad,fy=70,fw=w-pad*2,fh=h-fy-70,g;
+  x.strokeStyle=C.line;x.lineWidth=1;
+  for(g=1;g<6;g++){x.beginPath();x.moveTo(fx+fw*g/6,fy);x.lineTo(fx+fw*g/6,fy+fh);x.stroke()}
+  for(g=1;g<4;g++){x.beginPath();x.moveTo(fx,fy+fh*g/4);x.lineTo(fx+fw,fy+fh*g/4);x.stroke()}
+  x.strokeRect(fx,fy,fw,fh);
+  x.fillStyle=C.mmtc;x.beginPath();x.moveTo(tx,ty-24);x.lineTo(tx+13,ty+12);x.lineTo(tx-13,ty+12);x.closePath();x.fill();
+  x.strokeStyle=C.mmtc;x.lineWidth=1.5;x.globalAlpha=.5;for(var r=1;r<=2;r++){x.beginPath();x.arc(tx,ty-8,10+r*9,-2.4,-.74);x.stroke()}x.globalAlpha=1;
+  var nd=Math.min(s.dev,1800),per=s.dev>1800?s.dev/1800:1;
+  var duty=[.35,.12,.045,.014,.005][parseInt($('#m-int').value,10)],period=3000,awakeLen=700,awake=0;
+  for(var i=0;i<nd;i++){
+    var px=fx+4+hash(i*1.37)*(fw-8),py=fy+4+hash(i*2.71+5)*(fh-8);
+    var tt=t+hash(i*7.7)*period,ph=tt%period,cyc=Math.floor(tt/period),on=hash(i*3.3+cyc*9.1)<duty*(period/awakeLen)&&ph<awakeLen;
+    if(on){
+      awake++;var q=ph/awakeLen;
+      x.fillStyle=C.mmtc;x.globalAlpha=.9;x.beginPath();x.arc(px,py,3,0,6.283);x.fill();
+      x.globalAlpha=.5*(1-q);x.strokeStyle=C.mmtc;x.lineWidth=1.2;x.beginPath();x.arc(px,py,3+q*10,0,6.283);x.stroke();x.globalAlpha=1;
+    }else{x.globalAlpha=.4;x.fillStyle=C.mmtc;x.beginPath();x.arc(px,py,1.7,0,6.283);x.fill();x.globalAlpha=1}
+  }
+  x.fillStyle=C.ink;x.font=FD;x.textAlign='left';x.fillText(fmt(s.dev)+' devices per km²',pad,28);
+  x.fillStyle=C.muted;x.font=FM;x.fillText(per>1?'1 dot = '+fmt(Math.round(per))+' devices':'1 dot = 1 device',pad,48);
+  x.textAlign='right';x.fillText('awake now: '+fmt(Math.round(awake*per)),tx-30,fy-8);
+  var by=h-44,bw=Math.min(300,w-pad*2-110),bh=22,fillr=Math.min(s.life/15,1);
+  x.textAlign='left';x.fillStyle=C.ink;x.font=FD;x.fillText('Battery life',pad,by+16);
+  var b0=pad+100;rr(x,b0,by,bw,bh,5);x.strokeStyle=C.ink;x.lineWidth=1.5;x.stroke();x.fillStyle=C.ink;x.fillRect(b0+bw,by+6,4,10);
+  rr(x,b0+3,by+3,Math.max(2,(bw-6)*fillr),bh-6,3);x.fillStyle=s.life>=10?C.mmtc:(s.life>=1?C.embb:C.urllc);x.fill();
+  var txt=s.life<1?'about '+Math.max(1,Math.round(s.life*365))+' days':(s.life>=15?'15+ years':'about '+s.life.toFixed(1)+' years');
+  x.fillStyle=C.ink;x.font=FD;x.fillText(txt,b0+bw+16,by+16);
+}
+
+/* ---------- stepper ---------- */
+var ND={ue:[20,120,96,52,'UE','device'],gnb:[176,120,96,52,'gNB','radio'],amf:[356,40,104,52,'AMF','access'],nssf:[580,40,112,52,'NSSF','slice select'],smf:[356,198,104,52,'SMF','session'],upf:[580,198,112,52,'UPF','user plane'],dn:[770,198,110,52,'DN','data network']};
+var ED=[['ue','gnb'],['gnb','amf'],['amf','nssf'],['amf','smf'],['smf','upf'],['upf','dn'],['gnb','upf']];
+var UPFL={embb:['UPF','central','Internet / CDN'],urllc:['UPF','edge','Edge server'],mmtc:['UPF','light','IoT platform']};
+var ST=[
+ {n:['ue','gnb'],e:['ue-gnb'],t:'Device asks for a slice',b:function(){return 'Registration request lists the slices it wants.'}},
+ {n:['gnb','amf'],e:['gnb-amf'],t:'Base station picks an AMF',b:function(){return 'Request goes to an AMF that supports the slice.'}},
+ {n:['amf','nssf'],e:['amf-nssf'],t:'Core checks what is allowed',b:function(){return 'The NSSF selects which slices the device may use.'}},
+ {n:['ue','gnb','amf'],e:['ue-gnb','gnb-amf'],t:'Allowed slices come back',b:function(){return 'The device now knows its allowed slices.'}},
+ {n:['ue','amf','smf'],e:['gnb-amf','amf-smf'],t:'Device opens a session',b:function(k){return 'It names the slice (SST '+SST[k]+'). An SMF for that slice is chosen.'}},
+ {n:['smf','upf','dn'],e:['smf-upf','upf-dn','gnb-upf'],t:'Traffic flows through the slice',b:function(k){return {embb:'Central UPF, then the internet.',urllc:'Edge UPF, then a local server.',mmtc:'Light UPF, then an IoT platform.'}[k]}}
+];
+var stI=0,stK='embb';
+function buildArch(){
+  var h='<text class="plane" x="448" y="124" text-anchor="middle">control</text><text class="plane" x="420" y="284" text-anchor="middle">user data (N3)</text>';
+  ED.forEach(function(e){
+    var a=ND[e[0]],b=ND[e[1]],ax=a[0]+a[2]/2,ay=a[1]+a[3]/2,bx=b[0]+b[2]/2,by=b[1]+b[3]/2,id='e-'+e[0]+'-'+e[1];
+    if(e[0]==='gnb'&&e[1]==='upf'){ax=a[0]+a[2]/2;ay=a[1]+a[3];bx=b[0]+b[2]/2-20;by=b[1]+b[3];h+='<path class="edge dash" id="'+id+'" d="M'+ax+' '+ay+' C'+ax+' 285 '+bx+' 285 '+bx+' '+by+'"/>';return}
+    h+='<line class="edge" id="'+id+'" x1="'+ax+'" y1="'+ay+'" x2="'+bx+'" y2="'+by+'"/>';
+  });
+  Object.keys(ND).forEach(function(k){var n=ND[k];
+    h+='<g class="node" id="n-'+k+'"><rect x="'+n[0]+'" y="'+n[1]+'" width="'+n[2]+'" height="'+n[3]+'" rx="10"/><text class="t" x="'+(n[0]+n[2]/2)+'" y="'+(n[1]+22)+'">'+n[4]+'</text><text class="s" x="'+(n[0]+n[2]/2)+'" y="'+(n[1]+39)+'">'+n[5]+'</text></g>'});
+  $('#arch').innerHTML=h;
+}
+function renderStep(){
+  var st=ST[stI];$('#stepper').className='stepper s-'+stK;
+  Object.keys(ND).forEach(function(k){$('#n-'+k).classList.toggle('on',st.n.indexOf(k)>-1)});
+  ED.forEach(function(e){var id=e[0]+'-'+e[1],el=$('#e-'+id);el.classList.toggle('on',st.e.indexOf(id)>-1)});
+  var u=UPFL[stK];$('#n-upf .s').textContent=u[1];$('#n-dn .s').textContent=u[2];
+  $('#step-count').textContent='Step '+(stI+1)+' of '+ST.length;
+  $('#step-title').textContent=st.t;$('#step-text').textContent=st.b(stK);
+  $('#snssai').textContent='S-NSSAI = { SST: '+SST[stK]+' }  →  '+NAMES[stK];
+  $('#prev').disabled=stI===0;$('#next').textContent=stI===ST.length-1?'Restart':'Next step';
+  $$('#dots button').forEach(function(d,i){d.className=i<stI?'done':(i===stI?'cur':'')});
+}
+(function(){
+  buildArch();
+  var cg=$('#step-slice');
+  KEYS.forEach(function(k){var b=document.createElement('button');b.type='button';b.className='chip s-'+k;b.textContent=NAMES[k];b.setAttribute('aria-pressed',k===stK?'true':'false');
+    b.addEventListener('click',function(){stK=k;$$('#step-slice .chip').forEach(function(c){c.setAttribute('aria-pressed',c===b?'true':'false')});renderStep()});cg.appendChild(b)});
+  var d=$('#dots');ST.forEach(function(s,i){var b=document.createElement('button');b.type='button';b.setAttribute('aria-label','Go to step '+(i+1));b.addEventListener('click',function(){stI=i;renderStep()});d.appendChild(b)});
+  $('#prev').addEventListener('click',function(){if(stI>0){stI--;renderStep()}});
+  $('#next').addEventListener('click',function(){stI=stI===ST.length-1?0:stI+1;renderStep()});
+  renderStep();
+})();
+
+/* ---------- isolation lab ---------- */
+var labCv=$('#lab-canvas'),HN=160,lab={sliced:false,share:.2,burstUntil:0,hist:[],emb:[],last:0};
+function labModel(t,fb){
+  var burst=(fb===undefined)?(t<lab.burstUntil):fb;
+  var eDem=(burst?1.25:.5)+.04*Math.sin(t/430),uLoad=.06+.012*Math.sin(t/310),mLoad=.04,lat,eUsed;
+  if(lab.sliced){var s=lab.share,rho=Math.min(uLoad/s,.97);lat=.3/(1-rho);eUsed=Math.min(eDem,1-s-.1)}
+  else{var tot=eDem+uLoad+mLoad,r=Math.min(tot,.995);lat=Math.min(.3/(1-r),45);eUsed=Math.min(eDem,1-uLoad-mLoad)}
+  return {lat:lat,e:Math.min(eDem,1.4),eUsed:eUsed,burst:burst};
+}
+function labPush(t,fb){var m=labModel(t,fb);lab.hist.push(m.lat);lab.emb.push(m.e);if(lab.hist.length>HN){lab.hist.shift();lab.emb.shift()}return m}
+function labPrefill(){lab.hist=[];lab.emb=[];for(var i=0;i<HN;i++)labPush(1e15,false)}
+labPrefill();
+function drawLab(){
+  var f=fit(labCv),x=f.x,w=f.w,h=f.h;x.clearRect(0,0,w,h);
+  var L=46,R=w-14,T=14,B=h-70,ymax=10;
+  function Y(v){return B-(Math.min(v,ymax)/ymax)*(B-T)}
+  x.font=FM;x.textBaseline='middle';x.textAlign='right';
+  [0,2,4,6,8,10].forEach(function(v){x.strokeStyle=C.line;x.lineWidth=1;x.globalAlpha=.7;x.beginPath();x.moveTo(L,Y(v));x.lineTo(R,Y(v));x.stroke();x.globalAlpha=1;x.fillStyle=C.muted;x.fillText(v+' ms',L-6,Y(v))});
+  x.strokeStyle=C.mmtc;x.setLineDash([6,5]);x.lineWidth=1.5;x.beginPath();x.moveTo(L,Y(1));x.lineTo(R,Y(1));x.stroke();x.setLineDash([]);
+  x.fillStyle=C.mmtc;x.textAlign='left';x.fillText('1 ms target',L+6,Y(1)-9);
+  var n=lab.hist.length,dx=(R-L)/(HN-1),i;
+  x.lineWidth=2.5;x.lineJoin='round';
+  for(i=1;i<n;i++){var a=lab.hist[i-1],b=lab.hist[i];x.strokeStyle=(a>1||b>1)?C.urllc:C.embb;x.beginPath();x.moveTo(L+(i-1)*dx,Y(a));x.lineTo(L+i*dx,Y(b));x.stroke()}
+  if(n&&lab.hist[n-1]>=ymax){x.fillStyle=C.urllc;x.textAlign='right';x.fillText('off scale ↑',R,T+8)}
+  var bt=B+14,bh=h-bt-22;
+  x.fillStyle=C.surface2;rr(x,L,bt,R-L,bh,4);x.fill();
+  x.beginPath();x.moveTo(L,bt+bh);for(i=0;i<n;i++){x.lineTo(L+i*dx,bt+bh-Math.min(lab.emb[i]/1.4,1)*bh)}
+  x.lineTo(L+(n-1)*dx,bt+bh);x.closePath();x.globalAlpha=.55;x.fillStyle=C.embb;x.fill();x.globalAlpha=1;
+  x.strokeStyle=C.ink;x.globalAlpha=.5;x.setLineDash([3,3]);var cy=bt+bh-(1/1.4)*bh;x.beginPath();x.moveTo(L,cy);x.lineTo(R,cy);x.stroke();x.setLineDash([]);x.globalAlpha=1;
+  x.fillStyle=C.muted;x.textAlign='left';x.fillText('eMBB demand (dashed = link capacity)',L,h-8);
+  x.textAlign='right';x.fillText('last 8 s',R,h-8);x.textAlign='left';x.textBaseline='alphabetic';
+}
+function labUi(m){
+  $('#lat-v').textContent=(m.lat>=10?'>10':m.lat.toFixed(2))+' ms';
+  $('#ro-lat').className='ro '+(m.lat<=1?'ok':'bad');
+  $('#embb-v').textContent=Math.round(m.eUsed*100)+'%';
+  $('#lab-msg').textContent=(lab.sliced?'Slicing on. ':'Slicing off. ')+(m.burst?'Burst running.':'Illustrative queueing model, not a measurement.');
+}
+$('#sliced').addEventListener('change',function(e){lab.sliced=e.target.checked;labPrefill();labUi(labModel(performance.now()));drawLab()});
+$('#share').addEventListener('input',function(e){lab.share=e.target.value/100;$('#share-v').textContent=e.target.value+'%'});
+$('#burst').addEventListener('click',function(){lab.burstUntil=performance.now()+3000;if(reduce){labPrefill();for(var i=0;i<HN;i++){labPush(1e15,i>20&&i<80)}drawLab()}});
+
+/* ---------- matcher ---------- */
+var APPS=[
+ {n:'8K video',s:'embb',nd:[5,2,2,2,2]},{n:'Cloud gaming',s:'embb',nd:[5,4,3,2,2]},{n:'Stadium VR',s:'embb',nd:[5,3,3,5,2]},
+ {n:'Remote surgery',s:'urllc',nd:[3,5,5,1,2]},{n:'Factory robots',s:'urllc',nd:[2,5,5,3,2]},{n:'Vehicle safety alerts',s:'urllc',nd:[2,5,5,3,2]},
+ {n:'Smart meters',s:'mmtc',nd:[1,1,2,5,5]},{n:'City air sensors',s:'mmtc',nd:[1,1,2,5,5]},{n:'Farm soil sensors',s:'mmtc',nd:[1,1,2,4,5]}
+];
+var NEEDS=['Data rate','Latency strictness','Reliability','Device density','Battery life'],apI=0;
+function renderMatch(){
+  var a=APPS[apI],m=$('#match');m.className='match s-'+a.s;
+  var bars=NEEDS.map(function(n,i){var v=a.nd[i],sg='';for(var j=0;j<5;j++)sg+='<i'+(j<v?' class="f"':'')+'></i>';return '<div class="need"><span>'+n+'</span><div class="segs">'+sg+'</div><em>'+v+'/5</em></div>'}).join('');
+  m.innerHTML='<div><span class="verdict">BEST FIT</span><h3>'+NAMES[a.s]+' slice</h3><p class="fine mono" style="margin-top:4px">'+a.n+' · SST '+SST[a.s]+'</p></div><div>'+bars+'</div>';
+}
+(function(){
+  var c=$('#apps');
+  APPS.forEach(function(a,i){var b=document.createElement('button');b.type='button';b.className='chip s-'+a.s;b.textContent=a.n;b.setAttribute('aria-pressed',i===0?'true':'false');
+    b.addEventListener('click',function(){apI=i;$$('#apps .chip').forEach(function(z){z.setAttribute('aria-pressed',z===b?'true':'false')});renderMatch()});c.appendChild(b)});
+  renderMatch();
+})();
+
+/* ---------- 6G range chart ---------- */
+(function(){
+  var KP=[['Peak data rate','20 → 50–200 Gbit/s',2.5,10,''],['User-experienced rate','100 → 300–500 Mbit/s',3,5,''],['Area traffic capacity','10 → 30–50 Mbit/s/m²',3,5,''],['Spectrum efficiency','1.5–3×',1.5,3,''],
+    ['Latency','1 → 0.1–1 ms',1,10,'b'],['Reliability (error rate)','10⁻⁵ → 10⁻⁵–10⁻⁷',1,100,'b'],['Connection density','10⁶ → 10⁶–10⁸ /km²',1,100,'c'],['Mobility','500 → 500–1000 km/h',1,2,'c']];
+  function pos(v){return Math.log(v)/Math.log(100)*100}
+  var tk=[1,3,10,30,100],ax='',tks='',rows='';
+  tk.forEach(function(v){ax+='<span style="left:'+pos(v)+'%">'+v+'×</span>';tks+='<i class="tick" style="left:'+pos(v)+'%"></i>'});
+  $('#rc-axis').innerHTML=ax;
+  KP.forEach(function(k){var l=pos(k[2]),wd=Math.max(pos(k[3])-l,2.5);rows+='<div class="rc-row"><div><b>'+k[0]+'</b><small>'+k[1]+'</small></div><div class="track">'+tks+'<span class="r '+k[4]+'" style="left:'+l+'%;width:'+wd+'%"></span></div></div>'});
+  $('#rc-rows').innerHTML=rows;
+})();
+
+/* ---------- loop ---------- */
+var vis={hero:true,embb:true,urllc:true,mmtc:true,lab:true};
+if('IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){vis[e.target.getAttribute('data-v')]=e.isIntersecting})},{rootMargin:'100px'});
+  [['#hero-canvas','hero'],['#embb-canvas','embb'],['#urllc-canvas','urllc'],['#mmtc-canvas','mmtc'],['#lab-canvas','lab']].forEach(function(p){var el=$(p[0]);el.setAttribute('data-v',p[1]);io.observe(el)});
+}
+function redrawStatic(){U.cur=urllcTargets();drawHero(2200);drawEmbb(1500);drawUrllc(1000);drawMmtc(2500);drawLab()}
+var frame=0,lastUi=0;
+function loop(t){
+  frame++;if(frame%90===0)readColors();
+  if(vis.hero)drawHero(t);
+  if(vis.embb)drawEmbb(t);
+  if(vis.urllc)drawUrllc(t);
+  if(vis.mmtc)drawMmtc(t);
+  if(vis.lab){
+    var now=performance.now();
+    if(now-lab.last>50){lab.last=now;var m=labPush(now);if(now-lastUi>120){lastUi=now;labUi(m)}}
+    drawLab();
+  }
+  requestAnimationFrame(loop);
+}
+U.cur=urllcTargets();
+if(reduce){redrawStatic();window.addEventListener('resize',redrawStatic)}else requestAnimationFrame(loop);
+labUi(labModel(performance.now()));
+})();
+</script>
+
+</body></html>
